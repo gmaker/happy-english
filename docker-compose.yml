@@ -1,0 +1,81 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    environment:
+      # ВАЖНО: иначе Ollama слушает только 127.0.0.1 внутри контейнера,
+      # и другие контейнеры не смогут к нему подключиться
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cuda
+    container_name: speaches
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf-hub-cache:/home/ubuntu/.cache/huggingface/hub
+    environment:
+      # Чтобы Speaches мог (при желании) делать "voice chat proxy" через любой LLM с OpenAI-compatible API
+      - CHAT_COMPLETION_BASE_URL=http://ollama:11434/v1
+      - CHAT_COMPLETION_API_KEY=cant-be-empty
+
+      # Чтобы не держать STT/TTS модели постоянно в VRAM (полезно при 12GB VRAM на 4070 Ti):
+      # 0 = выгружать сразу после запроса; 300 = держать 5 минут; -1 = никогда не выгружать
+      - STT_MODEL_TTL=0
+      - TTS_MODEL_TTL=0
+
+      # Автоскачивание моделей при старте (если не хочешь — удали эти строки и скачай вручную командами ниже)
+      - PRELOAD_MODELS=["Systran/faster-whisper-large-v3","speaches-ai/Kokoro-82M-v1.0-ONNX"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    depends_on:
+      - ollama
+      - speaches
+    ports:
+      - "3000:8080"
+    volumes:
+      - open-webui:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+
+      # STT через Speaches (OpenAI-compatible)
+      - AUDIO_STT_ENGINE=openai
+      - AUDIO_STT_OPENAI_API_BASE_URL=http://speaches:8000/v1
+      - AUDIO_STT_OPENAI_API_KEY=does-not-matter-but-not-empty
+      - AUDIO_STT_MODEL=Systran/faster-whisper-large-v3
+
+      # TTS через Speaches (OpenAI-compatible)
+      - AUDIO_TTS_ENGINE=openai
+      - AUDIO_TTS_OPENAI_API_BASE_URL=http://speaches:8000/v1
+      - AUDIO_TTS_OPENAI_API_KEY=does-not-matter-but-not-empty
+      - AUDIO_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
+      - AUDIO_TTS_VOICE=af_heart
+      - AUDIO_TTS_SPLIT_ON=punctuation
+
+volumes:
+  ollama:
+  open-webui:
+  hf-hub-cache:
