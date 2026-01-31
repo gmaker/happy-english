@@ -1,21 +1,28 @@
 happy-english
 =============
 
-Минимальный стартовый проект. Здесь лежит `docker-compose.yml` для локального запуска сервисов.
+Минимальный стартовый проект для локального запуска.
 
 Запуск
 ------
-1) Установить Docker Desktop.
-2) В корне проекта:
-   ```
-   docker compose up -d
-   ```
-3) Проверить, что контейнеры поднялись:
-   ```
-   docker compose ps
-   ```
+```
+docker compose up -d
+```
 
-Настройка
----------
-- Порты и переменные окружения задаются в `docker-compose.yml`.
-- Если нужны файлы `.env`, добавь их рядом и подключи через `env_file`.
+Открыть в браузере
+------------------
+http://localhost:3000
+
+Скачивание других моделей
+-------------------------
+Ollama (LLM):
+```
+docker exec -it ollama ollama pull llama3.1
+```
+
+STT/TTS (Speaches):
+- Добавь модели в `PRELOAD_MODELS` в `docker-compose.yml` и перезапусти:
+  ```
+  docker compose up -d --force-recreate
+  ```
+- Модели должны совпадать с `AUDIO_STT_MODEL` и `AUDIO_TTS_MODEL`.
