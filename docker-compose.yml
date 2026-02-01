@@ -19,6 +19,33 @@ services:
               count: all
               capabilities: [gpu]
 
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: ollama-pull
+    depends_on:
+      - ollama
+    profiles:
+      - bootstrap
+    environment:
+      - OLLAMA_HOST=ollama:11434
+      - OLLAMA_MODEL=qwen2.5:14b-instruct
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - |
+        echo "Waiting for Ollama..."
+        for i in $(seq 1 120); do
+          if ollama list >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        echo "Pulling model: $${OLLAMA_MODEL}"
+        ollama pull "$${OLLAMA_MODEL}"
+    volumes:
+      - ollama:/root/.ollama
+    restart: "no"
+
   speaches:
     image: ghcr.io/speaches-ai/speaches:latest-cuda
     container_name: speaches
@@ -47,6 +74,29 @@ services:
               count: all
               capabilities: [gpu]
 
+  speaches-pull:
+    image: curlimages/curl:8.6.0
+    container_name: speaches-pull
+    depends_on:
+      - speaches
+    profiles:
+      - bootstrap
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - |
+        echo "Waiting for Speaches..."
+        for i in $(seq 1 120); do
+          if curl -fsS http://speaches:8000/health >/dev/null; then
+            break
+          fi
+          sleep 2
+        done
+        echo "Downloading Speaches models..."
+        curl -fsS -X POST "http://speaches:8000/v1/models/Systran%2Ffaster-whisper-large-v3" >/dev/null
+        curl -fsS -X POST "http://speaches:8000/v1/models/speaches-ai%2FKokoro-82M-v1.0-ONNX" >/dev/null
+    restart: "no"
+
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open-webui
@@ -59,6 +109,9 @@ services:
     volumes:
       - open-webui:/app/backend/data
     environment:
+      - WEBUI_ADMIN_EMAIL=${WEBUI_ADMIN_EMAIL}
+      - WEBUI_ADMIN_PASSWORD=${WEBUI_ADMIN_PASSWORD}
+      - WEBUI_ADMIN_NAME=${WEBUI_ADMIN_NAME:-Admin}
       - OLLAMA_BASE_URL=http://ollama:11434
 
       # STT через Speaches (OpenAI-compatible)
@@ -74,6 +127,25 @@ services:
       - AUDIO_TTS_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX
       - AUDIO_TTS_VOICE=af_heart
       - AUDIO_TTS_SPLIT_ON=punctuation
+
+  webui-bootstrap:
+    image: python:3.11-alpine
+    container_name: webui-bootstrap
+    depends_on:
+      - open-webui
+    profiles:
+      - bootstrap
+    environment:
+      - OPENWEBUI_URL=http://open-webui:8080
+      - WEBUI_ADMIN_EMAIL=${WEBUI_ADMIN_EMAIL}
+      - WEBUI_ADMIN_PASSWORD=${WEBUI_ADMIN_PASSWORD}
+    volumes:
+      - ./scripts/bootstrap_openwebui.py:/app/bootstrap_openwebui.py:ro
+      - ./seed:/seed:ro
+    entrypoint:
+      - python
+      - /app/bootstrap_openwebui.py
+    restart: "no"
 
 volumes:
   ollama:

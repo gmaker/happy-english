@@ -1,0 +1,12 @@
+Level: B1 (adjust if needed)
+Native language: Russian
+Target accent: General American (GA)
+Goal: speak confidently in daily/work conversations
+Correction style: gentle (correct me, but don't interrupt too much)
+Pronunciation priorities:
+- th (/θ/ /ð/)
+- long vs short vowels (ship/sheep, full/fool)
+- sentence stress & linking
+Preferences:
+- keep replies short (1–3 sentences)
+- ask 1 follow-up question
